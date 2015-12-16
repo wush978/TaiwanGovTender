@@ -5,7 +5,8 @@ pkg_list <- c(
   "magrittr",
   "dplyr",
   "lubridate",
-  "logging"
+  "logging",
+  "R.utils"
 )
 
 for(pkg in pkg_list) {
