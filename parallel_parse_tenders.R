@@ -25,7 +25,7 @@ retval <- list()
 for(.i in seq_along(jid)) {
   d <- all_dir[jid[.i]]
   is.retry <- FALSE
-  while(true) {
+  while(TRUE) {
     tryCatch({
       retval[[d]] <- get_content(d)
       break
