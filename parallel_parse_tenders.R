@@ -22,7 +22,13 @@ loginfo(sprintf("I have %d files to process", length(jid)))
 retval <- list()
 for(.i in seq_along(jid)) {
   d <- all_dir[jid[.i]]
-  retval[[d]] <- get_content(d)
+  tryCatch({
+    retval[[d]] <- get_content(d)
+  }, error = function(e) {
+    logerror(sprintf("Error is encoutered when I am processing %s ...", d))
+    logerror(sprintf("The error message is: %s", conditionMessage(e)))
+    quit("no", status = 1)
+  })
   if (.i %% 100 == 0) {
     loginfo(sprintf("Progress: (%d/%d)", .i, length(jid)))
   }
