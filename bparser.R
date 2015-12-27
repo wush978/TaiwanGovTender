@@ -22,6 +22,9 @@ set_root <- function(file_name){
            "html" = {
               dstname <- file_name
            },
+           "htmltmp" = {
+              dstname <- file_name
+           },
            stop("Unknown file extension"))
     htmlTreeParse(dstname) %>% xmlRoot
 }
