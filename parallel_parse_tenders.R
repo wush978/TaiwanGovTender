@@ -56,18 +56,21 @@ for(.i in seq_along(jid)) {
             get_param$content_mode <- get_param$content_mode + 1L
             next
           }
-          writeBin(content(res, "raw"), .tmp.html <- tempfile(fileext = ".html"))
+          .dst.html <- gsub(".gz", "", d, fixed = TRUE)
+          .tmp.html <- sprintf("%stmp", .dst.html)
+          writeBin(content(res, "raw"), .tmp.html)
           retval[[d]] <- tryCatch({
             get_content(.tmp.html)
           }, error = function(e) {
             get_content(.tmp.html, TRUE)
           })
-          file.rename(.tmp.html, gsub(".gz", "", d, fixed = TRUE))
+          file.rename(.tmp.html, .dst.html)
           is.request_for_get_complete <- FALSE
         }
         break
       }
     })
+    loginfo(sprintf("Trying to process %s again...", d))
   }
   if (.i %% 100 == 0) {
     loginfo(sprintf("Progress: (%d/%d)", .i, length(jid)))
