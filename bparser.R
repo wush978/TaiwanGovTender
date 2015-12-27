@@ -11,8 +11,10 @@ library(logging)
 
 set_root <- function(file_name){
     dstname <- tools::file_path_sans_ext(file_name)
+    dsttmp <- sprintf("%stmp", dstname)
     if (!file.exists(dstname)) {
-        gunzip(file_name, remove = FALSE)
+        gunzip(file_name, destname = dsttmp, remove = FALSE, overwrite = TRUE)
+        file.rename(dsttmp, dstname)
     }
     htmlTreeParse(dstname) %>% xmlRoot
 }
