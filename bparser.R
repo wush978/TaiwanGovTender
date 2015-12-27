@@ -207,7 +207,7 @@ minimum_parse <-function(file_name, rm_html = TRUE, save_a_csv_for_each = FALSE)
     path2 <- "//form[@id='mainForm']/table/tr/td/div[@id='printArea']/table/tbody/tr[@class='award_table_tr_2']/td"
     pattern_list <- list("標案案號")
     retval[["purchase_info"]] <- get_subtable(root, path1, path2, prefix = "", add_prefix = FALSE, shift = 1, keep_all = FALSE, pattern_list = pattern_list)  
-      
+    
     #3 投標廠商
     path1 <- "//form[@id='mainForm']/table/tr/td/div[@id='printArea']/table/tbody/tr[@class='award_table_tr_3']/td/table/tr/th"
     path2 <- "//form[@id='mainForm']/table/tr/td/div[@id='printArea']/table/tbody/tr[@class='award_table_tr_3']/td/table/tr/td"
@@ -264,7 +264,7 @@ gen_log_name <- function(instr){
 get_content <- function(d) {
     bname <- basename(d)
     dname <- dirname(d)
-    minimum_parse(paste0(start_dir, "/", d), rm_html = FALSE, save_a_csv_for_each = FALSE)
+    minimum_parse(paste0(d), rm_html = FALSE, save_a_csv_for_each = FALSE)
 }
 
 roaming_dir <- function(start_dir= "./", use_minimum_parse = TRUE, dont_save_each_csv = TRUE){
