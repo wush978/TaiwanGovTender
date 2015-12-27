@@ -102,7 +102,9 @@ get_subtable2 <- function(root, path1) {
     }
     node_set <- getNodeSet(root, path1)
     count <- node_set[[2]] %>% xmlValue %>% as.integer
-    tmp <- xmlChildren(node_set[[3]])
+    tryCatch({
+      tmp <- xmlChildren(node_set[[3]])
+    }, error = function(e) browser())
     tmp2 <- sapply(tmp[names(tmp) == "text"], xmlValue) %>%
       lapply(gsub, pattern = "\n|\t", replacement = "") %>%
       lapply(function(s) {
@@ -217,6 +219,7 @@ brute_force_parse <- function(file_name, rm_html = TRUE, save_a_csv_for_each = F
 }
 
 minimum_parse <-function(file_name, rm_html = TRUE, save_a_csv_for_each = FALSE, simplified_bidder_list = FALSE){
+    if (interactive()) browser()
     # 標案案號
     # 標案名稱
     # 決標日期
@@ -276,14 +279,16 @@ minimum_parse <-function(file_name, rm_html = TRUE, save_a_csv_for_each = FALSE,
 #         twdate[1] <- twdate[1] + 1911
 #       }),
       award = local({
-        tmp <- regmatches(tender_award_info[["總決標金額"]], regexec("^([0-9,]+)", tender_award_info[["總決標金額"]]))[[1]][2]
-        gsub(",", "", tmp) %>%
-          as.numeric
+        if (is.null(tender_award_info[["總決標金額"]])) {
+          NA
+        } else {
+          tmp <- regmatches(tender_award_info[["總決標金額"]], regexec("^([0-9,]+)", tender_award_info[["總決標金額"]]))[[1]][2]
+          award <- gsub(",", "", tmp) %>%
+            as.numeric
+          stopifnot(!is.na(award))
+        }
       })
     )
-    if (is.na(retval[["tender_award"]]$award)) {
-      browser()
-    }
     remove_html(file_name, rm_html)   
 #     if(save_a_csv_for_each) {
 #         export_to_csv(file_name, purchase_info, tender_award_info, tender_company_info)
