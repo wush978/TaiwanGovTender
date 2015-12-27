@@ -5,15 +5,16 @@ library(stringr)
 library(tools)
 library(stringi)
 library(R.utils)
+library(logging)
 #library(rlist)
 #library(parallel)
 
 set_root <- function(file_name){
-    gunzip(file_name, remove = FALSE, overwrite=TRUE)
-    regexp_rule = paste0("\\.",file_ext(file_name),"$")
-    sub(regexp_rule, x = file_name, replacement = "") %>% 
-        htmlTreeParse %>% xmlRoot
-    
+    dstname <- tools::file_path_sans_ext(file_name)
+    if (!file.exists(dstname)) {
+        gunzip(file_name, remove = FALSE)
+    }
+    htmlTreeParse(dstname) %>% xmlRoot
 }
 
 node_value_list <- function(root, path){
@@ -43,9 +44,10 @@ remove_space <- function(instr){
 }
 
 remove_html <- function(file_name, rm_html){
-    if(rm_html)
+    if(rm_html) {
         file_path_sans_ext(file_name) %>%
         file.remove
+    }
 }
 
 remove_by_name <- function(inlist, pattern){
@@ -142,6 +144,7 @@ export_to_csv <- function(file_name = "temp.csv", ...){
 }
 
 brute_force_parse <- function(file_name, rm_html = TRUE, save_a_csv_for_each = FALSE){
+    browser()
     #0 initiate
     root <- set_root(file_name)
     
@@ -196,14 +199,14 @@ minimum_parse <-function(file_name, rm_html = TRUE, save_a_csv_for_each = FALSE)
 
     #0 initiate
     root <- set_root(file_name)
-    
+    retval <- list()
     #1 機關資料
 
     #2 採購資料
     path1 <- "//form[@id='mainForm']/table/tr/td/div[@id='printArea']/table/tbody/tr[@class='award_table_tr_2']/th"
     path2 <- "//form[@id='mainForm']/table/tr/td/div[@id='printArea']/table/tbody/tr[@class='award_table_tr_2']/td"
     pattern_list <- list("標案案號")
-    purchase_info <- get_subtable(root, path1, path2, prefix = "", add_prefix = FALSE, shift = 1, keep_all = FALSE, pattern_list = pattern_list)  
+    retval[["purchase_info"]] <- get_subtable(root, path1, path2, prefix = "", add_prefix = FALSE, shift = 1, keep_all = FALSE, pattern_list = pattern_list)  
       
     #3 投標廠商
     path1 <- "//form[@id='mainForm']/table/tr/td/div[@id='printArea']/table/tbody/tr[@class='award_table_tr_3']/td/table/tr/th"
@@ -211,6 +214,16 @@ minimum_parse <-function(file_name, rm_html = TRUE, save_a_csv_for_each = FALSE)
     pattern_list <- list("投標廠商","投標廠商家數", "廠商代碼", "廠商名稱", "是否得標")
     tender_company_info <- get_subtable(root, path1, path2, prefix = "", add_prefix = FALSE, shift = 0, check_tender = TRUE, keep_all = FALSE, pattern_list = pattern_list)
     tender_company_info <- remove_by_name(tender_company_info, "投標廠商[0-9]+$")
+    tender_company <- vector("list", as.integer(tender_company_info[["投標廠商家數"]]))
+    for(.i in seq_along(tender_company)) {
+      element <- list(
+          id = tender_company_info[[sprintf("投標廠商%d.廠商代碼", .i)]],
+          name = tender_company_info[[sprintf("投標廠商%d.廠商名稱", .i)]],
+          is_win = tender_company_info[[sprintf("投標廠商%d.是否得標", .i)]] == "是"
+      )
+      tender_company[[.i]] <- element
+    }
+    retval[["tender_company"]] <- tender_company
         
     #4 決標品項
 
@@ -220,12 +233,26 @@ minimum_parse <-function(file_name, rm_html = TRUE, save_a_csv_for_each = FALSE)
     pattern_list <- list("決標日期", "總決標金額") 
     tender_award_info <- get_subtable(root, path1, path2,prefix = "", add_prefix = FALSE, shift = 1, keep_all = FALSE, pattern_list = pattern_list)    
     tender_award_info <- remove_by_name(tender_award_info, "總決標金額.+")
-
+    retval[["tender_award"]] <- list(
+#'      Date parsing has bug
+#'      Example: tenders/112/617/0/931116-2.html
+#       date = local({
+#         twdate <- strsplit(tender_award_info[["決標日期"]], "/")[[1]] %>%
+#             sapply(as.integer)
+#         twdate[1] <- twdate[1] + 1911
+#       }),
+      award = local({
+        gsub(",|元", "", tender_award_info[["總決標金額"]]) %>%
+          as.numeric
+      })
+    )
     remove_html(file_name, rm_html)   
-    if(save_a_csv_for_each) 
-        export_to_csv(file_name, purchase_info, tender_award_info, tender_company_info)
-    else
-        export_to_string_list(file_name, purchase_info, tender_award_info, tender_company_info)
+#     if(save_a_csv_for_each) {
+#         export_to_csv(file_name, purchase_info, tender_award_info, tender_company_info)
+#     } else {
+#         export_to_string_list(file_name, purchase_info, tender_award_info, tender_company_info)
+#     }
+    retval
 }
 
 
@@ -234,56 +261,24 @@ gen_log_name <- function(instr){
     paste0(tmp, ".log")
 }
 
-roaming_dir <- function(start_dir= "./", write_log = FALSE, use_minimum_parse = TRUE, dont_save_each_csv = TRUE){
-    start_time <- Sys.time()
-    paste("start roaming_dir, timestamp = ", as.character(start_time)) %>% print
+get_content <- function(d) {
+    bname <- basename(d)
+    dname <- dirname(d)
+    minimum_parse(paste0(start_dir, "/", d), rm_html = FALSE, save_a_csv_for_each = FALSE)
+}
 
-    all_dir <- dir(start_dir, recursive = TRUE)
+roaming_dir <- function(start_dir= "./", use_minimum_parse = TRUE, dont_save_each_csv = TRUE){
+    loginfo(paste("start roaming_dir, timestamp = ", as.character(start_time)))
+
+    all_dir <- dir(start_dir, "gz$", recursive = TRUE)
     
-    if(write_log)
-        log_name <- as.character(start_time) %>% gen_log_name 
-        write(c("dir index", "basename", "dirname", "exec time"), ncolumns = 4, file=log_name, append = TRUE)    
-
     all_column_names <- ""
     column_number <- 0
         
     iter_cnt <- 1
-    
+
     for(d in all_dir){
-        iter_start_time <- Sys.time()
-        bname <- basename(d)
-        dname <- dirname(d)
-        
-        content <-{
-            if(use_minimum_parse)
-                minimum_parse(paste0(start_dir, "/", d), rm_html = TRUE, save_a_csv_for_each = !dont_save_each_csv)
-            else
-                brute_force_parse(paste0(start_dir, "/", d), rm_html = TRUE, save_a_csv_for_each = !dont_save_each_csv)            
-        }
-        
-        if(dont_save_each_csv){
-            if(iter_cnt %% 2000 == 1)
-                paste0(as.character(iter_cnt), " files parsed, timestamp = ", as.character(Sys.time())) %>% print
-                fname <- paste0("tender", as.character(iter_cnt %/% 2000),".csv")
-            
-            write(content[[2]], file = fname, append = TRUE )
-                
-            if(length(strsplit(content[[1]], ", ", fixed=TRUE)) > column_number){
-                all_column_names <- content[[1]]
-                column_number <- length(strsplit(content[[1]], ", ", fixed=TRUE))
-            }
-        }
-        
-        
-        iter_end_time <- Sys.time()
-        if(write_log)
-            log_content = paste(as.character(iter_cnt), bname, dname, as.character(iter_start_time - iter_end_time), sep=", ")
-            write(log_content, ncolumns = 4, file=log_name, append = TRUE)
-        iter_cnt = iter_cnt + 1
     }
-    
-    end_time <- Sys.time()
-    paste(as.character(iter_cnt), " files parsed, elapse time: ", as.character(end_time - start_time)) %>% print
     
     invisible(all_column_names)
 }
