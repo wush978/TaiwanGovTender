@@ -10,7 +10,7 @@ suppressPackageStartupMessages({
 .size <- comm.size()
 if (.rank == 0) {
   all_dir <- dir("tenders", "gz$", recursive = TRUE, full.names = TRUE)
-  all_dir <- head(all_dir, 50)
+  # all_dir <- head(all_dir, 50)
   loginfo(sprintf("There are total %d files to process...", length(all_dir)))
   invisible(bcast(all_dir))
 } else {
