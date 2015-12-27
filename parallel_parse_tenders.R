@@ -21,14 +21,30 @@ jid <- pbdMPI::get.jid(length(all_dir))
 loginfo(sprintf("I have %d files to process", length(jid)))
 url_format <- "http://web.pcc.gov.tw/tps/main/pms/tps/atm/atmAwardAction.do?newEdit=false&searchMode=common&method=inquiryForPublic&pkAtmMain=%s&tenderCaseNo=%s&contentMode=%d"
 pattern <- "tenders/(.*)/([^/]+).html.gz$"
-retval <- list()
+retval.path <- sprintf("parallel_parse_tenders-%03d.Rds", .rank)
+if (file.exists(retval.path)) {
+  retval <- readRDS(retval.path)
+} else {
+  retval <- list()
+}
+barrier()
+save_progress <- function() {
+  tmp.path <- sprintf("%s.tmp", retval.path)
+  saveRDS(globalenv()$retval, tmp.path)
+  file.rename(tmp.path, retval.path)
+}
+options(error = function() {
+  save_progress()
+})
 for(.i in seq_along(jid)) {
   d <- all_dir[jid[.i]]
+  if (!is.null(retval[[d]])) next
   is.retry <- FALSE
   is.done <- FALSE
   while (!is.done) {
+    .element <- NULL
     tryCatch({
-      retval[[d]] <- tryCatch({
+      .element <- tryCatch({
         get_content(d)
       }, error = function(e) {
         logwarn(sprintf("Using default get_content encounter: %s", conditionMessage(e)))
@@ -69,7 +85,7 @@ for(.i in seq_along(jid)) {
           .tmp.html <- sprintf("%s.tmp.html", .dst.html)
           writeBin(content(res, "raw"), .tmp.html)
           if (interactive()) browseURL(.tmp.html)
-          retval[[d]] <<- tryCatch({
+          .element <<- tryCatch({
             get_content(.tmp.html)
           }, error = function(e) {
             logwarn(sprintf("Using default get_content encounter: %s", conditionMessage(e)))
@@ -83,9 +99,12 @@ for(.i in seq_along(jid)) {
     })
     if (!is.done) loginfo(sprintf("Trying to process %s again...", d))
   }
+  stopifnot(is.null(.element))
+  retval[[d]] <- .element
   if (.i %% 100 == 0) {
     loginfo(sprintf("Progress: (%d/%d)", .i, length(jid)))
+    save_progress()
   }
 }
-saveRDS(retval, file = sprintf("parallel_parse_tenders-%03d.Rds", .rank))
+save_progress()
 pbdMPI::finalize()
