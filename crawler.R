@@ -37,23 +37,37 @@ browse_html <- function(gz_path) {
   invisible(NULL)
 }
 
+is_done <- function(dst_path) {
+  file.exists(dst_path) | file.exists(paste(dst_path, "gz", sep = "."))  
+}
+
 for(i in seq_along(page_csv_list)) {
   page_csv_path <- page_csv_list[i]
   loginfo(sprintf("Crawling page from %s", page_csv_path))
   df <- read.table(gzfile(page_csv_path), header = TRUE, sep = ",", colClasses = "character")
   for(j in seq_len(nrow(df))) {
-    loginfo(sprintf("\tCrawling (%d/%d)", j, nrow(df)))
+    loginfo(sprintf("\tCrawling (%d/%d  %s:%s)", j, nrow(df), opt$month, page_csv_path))
     href <- df$href[j]
     dst_path <- parse_href(href)
-    if (!file.exists(dst_path)) {
+    try_count <- 0
+    while (!is_done(dst_path)) {
       if (!dirname(dst_path) %>% dir.exists) dir.create(dirname(dst_path), recursive = TRUE)
       url <- gsub("..", "http://web.pcc.gov.tw/tps", href, fixed = TRUE)
-      res <- GET(url)
-      stop_for_status(res)
-      writeBin(content(res, "raw"), dst_path)
-      R.utils::gzip(dst_path)
-      # browse_html(paste(dst_path, "gz", sep = "."))
-      Sys.sleep(rpois(1, 1))
+      try_count <- try_count + 1
+      tryCatch({
+        loginfo(sprintf("Downloading to %s...(%d)", dst_path, try_count))
+        res <- GET(url, set_cookies(), verbose())
+        stop_for_status(res)
+        tmp_path <- tempfile(tmpdir = dirname(dst_path), fileext = ".tmp")
+        writeBin(content(res, "raw"), tmp_path)
+        R.utils::gzip(tmp_path)
+        file.rename(paste(tmp_path, "gz", sep = "."), paste(dst_path, "gz", sep = "."))
+      }, error = function(e) {
+        logerror(conditionMessage(e))
+        if (try_count > 20) stop(conditionMessage(e))
+        Sys.sleep(1 + rpois(1, 5))
+      })
+      Sys.sleep(rpois(1, 2))
     }
   }
 }
