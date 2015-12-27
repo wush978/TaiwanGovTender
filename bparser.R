@@ -10,12 +10,19 @@ library(logging)
 #library(parallel)
 
 set_root <- function(file_name){
-    dstname <- tools::file_path_sans_ext(file_name)
-    dsttmp <- sprintf("%stmp", dstname)
-    if (!file.exists(dstname)) {
-        gunzip(file_name, destname = dsttmp, remove = FALSE, overwrite = TRUE)
-        file.rename(dsttmp, dstname)
-    }
+    switch(tools::file_ext(file_name),
+           "gz" = {
+                dstname <- tools::file_path_sans_ext(file_name)
+                dsttmp <- sprintf("%stmp", dstname)
+                if (!file.exists(dstname)) {
+                    gunzip(file_name, destname = dsttmp, remove = FALSE, overwrite = TRUE)
+                    file.rename(dsttmp, dstname)
+                }
+           },
+           "html" = {
+              dstname <- file_name
+           },
+           stop("Unknown file extension"))
     htmlTreeParse(dstname) %>% xmlRoot
 }
 
@@ -86,6 +93,24 @@ get_subtable <- function(root, path1, path2, prefix, add_prefix = FALSE, shift =
     subtable
 }
 
+get_subtable2 <- function(root, path1) {
+    dum.fun <- function(x) { 
+        if (xmlName(x)=="br") { "<br/>" } else { xmlValue(x) }
+    }
+    node_set <- getNodeSet(root, path1)
+    count <- node_set[[2]] %>% xmlValue %>% as.integer
+    tmp <- xmlChildren(node_set[[3]])
+    tmp2 <- sapply(tmp[names(tmp) == "text"], xmlValue) %>%
+      lapply(gsub, pattern = "\n|\t", replacement = "") %>%
+      lapply(function(s) {
+        tmp <- regmatches(s, regexec(pattern = "(\\d+)([得]標)(\\d+)([^\\d]*)$", s))[[1]]
+        list(id = tmp[4], name = tmp[5], is_win = (tmp[2] == "得標"))
+      })
+    names(tmp2) <- NULL
+    stopifnot(count == length(tmp2))
+    tmp2
+}
+
 
 export_to_string_list <- function(file_name = "temp.csv", ...){
     arg <- list(...)
@@ -146,7 +171,6 @@ export_to_csv <- function(file_name = "temp.csv", ...){
 }
 
 brute_force_parse <- function(file_name, rm_html = TRUE, save_a_csv_for_each = FALSE){
-    browser()
     #0 initiate
     root <- set_root(file_name)
     
@@ -189,7 +213,7 @@ brute_force_parse <- function(file_name, rm_html = TRUE, save_a_csv_for_each = F
         export_to_string_list(file_name, purchase_info, tender_award_info, tender_company_info)
 }
 
-minimum_parse <-function(file_name, rm_html = TRUE, save_a_csv_for_each = FALSE){
+minimum_parse <-function(file_name, rm_html = TRUE, save_a_csv_for_each = FALSE, simplified_bidder_list = FALSE){
     # 標案案號
     # 標案名稱
     # 決標日期
@@ -211,21 +235,26 @@ minimum_parse <-function(file_name, rm_html = TRUE, save_a_csv_for_each = FALSE)
     retval[["purchase_info"]] <- get_subtable(root, path1, path2, prefix = "", add_prefix = FALSE, shift = 1, keep_all = FALSE, pattern_list = pattern_list)  
     
     #3 投標廠商
-    path1 <- "//form[@id='mainForm']/table/tr/td/div[@id='printArea']/table/tbody/tr[@class='award_table_tr_3']/td/table/tr/th"
-    path2 <- "//form[@id='mainForm']/table/tr/td/div[@id='printArea']/table/tbody/tr[@class='award_table_tr_3']/td/table/tr/td"
-    pattern_list <- list("投標廠商","投標廠商家數", "廠商代碼", "廠商名稱", "是否得標")
-    tender_company_info <- get_subtable(root, path1, path2, prefix = "", add_prefix = FALSE, shift = 0, check_tender = TRUE, keep_all = FALSE, pattern_list = pattern_list)
-    tender_company_info <- remove_by_name(tender_company_info, "投標廠商[0-9]+$")
-    tender_company <- vector("list", as.integer(tender_company_info[["投標廠商家數"]]))
-    for(.i in seq_along(tender_company)) {
-      element <- list(
-          id = tender_company_info[[sprintf("投標廠商%d.廠商代碼", .i)]],
-          name = tender_company_info[[sprintf("投標廠商%d.廠商名稱", .i)]],
-          is_win = tender_company_info[[sprintf("投標廠商%d.是否得標", .i)]] == "是"
-      )
-      tender_company[[.i]] <- element
+    if (simplified_bidder_list) {
+        path1 <- "//form[@id='mainForm']/table/tr/td/div[@id='printArea']/table/tbody/tr[@class='award_table_tr_3']/td"
+        retval[["tender_company"]] <- get_subtable2(root, path1)
+    } else {
+        path1 <- "//form[@id='mainForm']/table/tr/td/div[@id='printArea']/table/tbody/tr[@class='award_table_tr_3']/td/table/tr/th"
+        path2 <- "//form[@id='mainForm']/table/tr/td/div[@id='printArea']/table/tbody/tr[@class='award_table_tr_3']/td/table/tr/td"
+        pattern_list <- list("投標廠商","投標廠商家數", "廠商代碼", "廠商名稱", "是否得標")
+        tender_company_info <- get_subtable(root, path1, path2, prefix = "", add_prefix = FALSE, shift = 0, check_tender = TRUE, keep_all = FALSE, pattern_list = pattern_list)
+        tender_company_info <- remove_by_name(tender_company_info, "投標廠商[0-9]+$")
+        tender_company <- vector("list", as.integer(tender_company_info[["投標廠商家數"]]))
+        for(.i in seq_along(tender_company)) {
+          element <- list(
+              id = tender_company_info[[sprintf("投標廠商%d.廠商代碼", .i)]],
+              name = tender_company_info[[sprintf("投標廠商%d.廠商名稱", .i)]],
+              is_win = tender_company_info[[sprintf("投標廠商%d.是否得標", .i)]] == "是"
+          )
+          tender_company[[.i]] <- element
+        }
+        retval[["tender_company"]] <- tender_company
     }
-    retval[["tender_company"]] <- tender_company
         
     #4 決標品項
 
@@ -263,10 +292,10 @@ gen_log_name <- function(instr){
     paste0(tmp, ".log")
 }
 
-get_content <- function(d) {
+get_content <- function(d, simplified_bidder_list = FALSE) {
     bname <- basename(d)
     dname <- dirname(d)
-    minimum_parse(paste0(d), rm_html = FALSE, save_a_csv_for_each = FALSE)
+    minimum_parse(paste0(d), rm_html = FALSE, save_a_csv_for_each = FALSE, simplified_bidder_list = simplified_bidder_list)
 }
 
 roaming_dir <- function(start_dir= "./", use_minimum_parse = TRUE, dont_save_each_csv = TRUE){

@@ -19,16 +19,56 @@ if (.rank == 0) {
 }
 jid <- pbdMPI::get.jid(length(all_dir))
 loginfo(sprintf("I have %d files to process", length(jid)))
+url_format <- "http://web.pcc.gov.tw/tps/main/pms/tps/atm/atmAwardAction.do?newEdit=false&searchMode=common&method=inquiryForPublic&pkAtmMain=%s&tenderCaseNo=%s&contentMode=%d"
+pattern <- "tenders/(.*)/([^/]+).html.gz$"
 retval <- list()
 for(.i in seq_along(jid)) {
   d <- all_dir[jid[.i]]
-  tryCatch({
-    retval[[d]] <- get_content(d)
-  }, error = function(e) {
-    logerror(sprintf("Error is encoutered when I am processing %s ...", d))
-    logerror(sprintf("The error message is: %s", conditionMessage(e)))
-    quit("no", status = 1)
-  })
+  is.retry <- FALSE
+  while(true) {
+    tryCatch({
+      retval[[d]] <- get_content(d)
+      break
+    }, error = function(e) {
+      logerror(sprintf("Error is encoutered when I am processing %s ...", d))
+      logerror(sprintf("The error message is: %s", conditionMessage(e)))
+      if (is.retry) quit("no", status = 1)
+      is.retry <- TRUE
+      { # retry
+        get_param <- local({
+          tmp <- regmatches(d, regexec(pattern, d))[[1]]
+          list(pkAtmMain = gsub("/", "", tmp[2]), tenderCaseNo = tmp[3], content_mode = 0L)
+        })
+        is.request_for_get_complete <- TRUE
+        while(is.request_for_get_complete) {
+          url <- sprintf(url_format, get_param$pkAtmMain, get_param$tenderCaseNo, get_param$content_mode)
+          logwarn(sprintf("Retrying download page from %s...", url))
+          res <- httr::GET(url)
+          if (res$status_code == 500) {
+            Sys.sleep(rpois(1, 5))
+            next
+          }
+          stop_for_status(res)
+    #       writeBin(content(res, "raw"), .tmp.html <- tempfile(fileext=".html"))
+    #       browseURL(.tmp.html)
+          html_text <- content(res, as = "text")
+          if (grepl("請使用\"顯示完整資料\"察看詳細資料。", html_text, fixed = TRUE)) {
+            get_param$content_mode <- get_param$content_mode + 1L
+            next
+          }
+          writeBin(content(res, "raw"), .tmp.html <- tempfile(fileext = ".html"))
+          retval[[d]] <- tryCatch({
+            get_content(.tmp.html)
+          }, error = function(e) {
+            get_content(.tmp.html, TRUE)
+          })
+          file.rename(.tmp.html, gsub(".gz", "", d, fixed = TRUE))
+          is.request_for_get_complete <- FALSE
+        }
+        break
+      }
+    })
+  }
   if (.i %% 100 == 0) {
     loginfo(sprintf("Progress: (%d/%d)", .i, length(jid)))
   }
