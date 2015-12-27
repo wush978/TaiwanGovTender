@@ -25,15 +25,21 @@ retval <- list()
 for(.i in seq_along(jid)) {
   d <- all_dir[jid[.i]]
   is.retry <- FALSE
-  while(TRUE) {
+  is.done <- FALSE
+  while (!is.done) {
     tryCatch({
-      retval[[d]] <- get_content(d)
-      break
+      retval[[d]] <- tryCatch({
+        get_content(d)
+      }, error = function(e) {
+        get_content(d, TRUE)
+      })
+      is.done <- TRUE
+      next
     }, error = function(e) {
       logerror(sprintf("Error is encoutered when I am processing %s ...", d))
       logerror(sprintf("The error message is: %s", conditionMessage(e)))
       if (is.retry) quit("no", status = 1)
-      is.retry <- TRUE
+      is.retry <<- TRUE
       { # retry
         get_param <- local({
           tmp <- regmatches(d, regexec(pattern, d))[[1]]
@@ -59,7 +65,7 @@ for(.i in seq_along(jid)) {
           .dst.html <- gsub(".gz", "", d, fixed = TRUE)
           .tmp.html <- sprintf("%stmp", .dst.html)
           writeBin(content(res, "raw"), .tmp.html)
-          retval[[d]] <- tryCatch({
+          retval[[d]] <<- tryCatch({
             get_content(.tmp.html)
           }, error = function(e) {
             get_content(.tmp.html, TRUE)
@@ -67,10 +73,10 @@ for(.i in seq_along(jid)) {
           file.rename(.tmp.html, .dst.html)
           is.request_for_get_complete <- FALSE
         }
-        break
+        is.done <<- TRUE
       }
     })
-    loginfo(sprintf("Trying to process %s again...", d))
+    if (!is.done) loginfo(sprintf("Trying to process %s again...", d))
   }
   if (.i %% 100 == 0) {
     loginfo(sprintf("Progress: (%d/%d)", .i, length(jid)))
