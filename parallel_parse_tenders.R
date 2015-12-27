@@ -99,7 +99,7 @@ for(.i in seq_along(jid)) {
     })
     if (!is.done) loginfo(sprintf("Trying to process %s again...", d))
   }
-  stopifnot(is.null(.element))
+  stopifnot(!is.null(.element))
   retval[[d]] <- .element
   if (.i %% 100 == 0) {
     loginfo(sprintf("Progress: (%d/%d)", .i, length(jid)))
