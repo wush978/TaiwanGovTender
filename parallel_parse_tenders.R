@@ -31,6 +31,7 @@ for(.i in seq_along(jid)) {
       retval[[d]] <- tryCatch({
         get_content(d)
       }, error = function(e) {
+        logwarn(sprintf("Using default get_content encounter: %s", conditionMessage(e)))
         get_content(d, TRUE)
       })
       is.done <- TRUE
@@ -38,7 +39,9 @@ for(.i in seq_along(jid)) {
     }, error = function(e) {
       logerror(sprintf("Error is encoutered when I am processing %s ...", d))
       logerror(sprintf("The error message is: %s", conditionMessage(e)))
-      if (is.retry) quit("no", status = 1)
+      if (is.retry) {
+        quit("no", status = 1)
+      }
       is.retry <<- TRUE
       { # retry
         get_param <- local({
@@ -63,11 +66,13 @@ for(.i in seq_along(jid)) {
             next
           }
           .dst.html <- gsub(".gz", "", d, fixed = TRUE)
-          .tmp.html <- sprintf("%stmp", .dst.html)
+          .tmp.html <- sprintf("%s.tmp.html", .dst.html)
           writeBin(content(res, "raw"), .tmp.html)
+          if (interactive()) browseURL(.tmp.html)
           retval[[d]] <<- tryCatch({
             get_content(.tmp.html)
           }, error = function(e) {
+            logwarn(sprintf("Using default get_content encounter: %s", conditionMessage(e)))
             get_content(.tmp.html, TRUE)
           })
           file.rename(.tmp.html, .dst.html)
