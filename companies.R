@@ -73,6 +73,15 @@ companies <-
         dir("company-info", "^\\d*.json", full.names = TRUE)
       loginfo(sprintf("Create %d clusters to parse data", length(companies)))
       cl <- makePSOCKcluster(length(companies))
+      clusterEvalQ(cl, {
+        library(magrittr)
+        library(jsonlite)
+        library(parallel)
+        library(logging)
+        basicConfig()
+        
+        library(data.table)
+      })
       companies <- parLapply(cl, companies, parse_company)
       stopCluster(cl)
       loginfo("Combining data.frame...")
