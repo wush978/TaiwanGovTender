@@ -30,9 +30,36 @@ companies <-
           }
         })
       loginfo(sprintf("Generating data.frame ..."))
+      .id <- sapply(tmp2, `[`, 2)
+      .data <- lapply(tmp3, function(obj) {
+        is_subcompany <- "總(本)公司統一編號" %in% names(obj)
+        if (is_subcompany) {
+          name <- obj[["分公司名稱"]]
+          parent <- obj[["總(本)公司統一編號"]]
+        } else {
+          name <- obj[["公司名稱"]]
+          parent <- NA
+        }
+        birthday <- obj[["核准設立日期"]]
+        birthday <- if (is.null(birthday)) {
+          NA
+        } else {
+          ISOdate(birthday$year, birthday$month, birthday$day) %>% as.Date
+        }
+        list(name = paste(name, collapse = ";"), parent = parent, birthday = birthday)
+      })
+      stopifnot(length(.id) == length(.data))
+      .magnate <- tmp4
+      stopifnot(length(.id) == length(.magnate))
       retval <- data.frame(stringsAsFactors = FALSE,
-                 id = sapply(tmp2, `[`, 2),
-                 magnate = tmp4)
+                 id = .id,
+                 name = sapply(.data, `[[`, "name"),
+                 parent = sapply(.data, `[[`, "parent"),
+                 birthday = sapply(.data, `[[`, "birthday"),
+                 magnate = .magnate)
+      class(retval$birthday) <- "Date"
+      (sapply(retval, class) == c("character", "character", "character", "Date", "character")) %>%
+        all %>% stopifnot
       loginfo(sprintf("Writing Rds..."))
       saveRDS(object = retval, file = dst)
       retval
@@ -46,7 +73,8 @@ companies <-
         lapply(parse_company)
       
       loginfo("Combining data.frame...")
-      companies <- rbindlist(companies)
+      companies <- rbindlist(companies) %>%
+        as.data.frame
       loginfo("Writing result...")
       saveRDS(companies, dst)
       companies
