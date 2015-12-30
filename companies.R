@@ -1,5 +1,6 @@
 library(magrittr)
 library(jsonlite)
+library(parallel)
 library(logging)
 basicConfig()
 
@@ -69,9 +70,11 @@ companies <-
       readRDS(dst)
     } else {
       companies <-
-        dir("company-info", "^\\d*.json", full.names = TRUE) %>%
-        lapply(parse_company)
-      
+        dir("company-info", "^\\d*.json", full.names = TRUE)
+      loginfo(sprintf("Create %d clusters to parse data", length(companies)))
+      cl <- makePSOCKcluster(length(companies))
+      companies <- parLapply(cl, companies, parse_company)
+      stopCluster(cl)
       loginfo("Combining data.frame...")
       companies <- rbindlist(companies) %>%
         as.data.frame
