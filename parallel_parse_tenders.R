@@ -47,7 +47,7 @@ for(.i in seq_along(jid)) {
       .element <- tryCatch({
         get_content(d)
       }, error = function(e) {
-        logwarn(sprintf("Using default get_content encounter: %s", conditionMessage(e)))
+        logwarn(sprintf("Using default get_content to parse %s encounter: %s", d, conditionMessage(e)))
         get_content(d, TRUE)
       })
       is.done <- TRUE
@@ -88,8 +88,13 @@ for(.i in seq_along(jid)) {
           .element <<- tryCatch({
             get_content(.tmp.html)
           }, error = function(e) {
-            logwarn(sprintf("Using default get_content encounter: %s", conditionMessage(e)))
-            get_content(.tmp.html, TRUE)
+            logwarn(sprintf("Using default get_content to parse %s encounter: %s", d, conditionMessage(e)))
+            tryCatch({
+              get_content(.tmp.html, TRUE)
+            }, error = function(e) {
+              logerror(sprintf("Processing %s is failed to recover from error: %s", d, conditionMessage(e)))
+              stop(conditionMessage(e))
+            })
           })
           file.rename(.tmp.html, .dst.html)
           is.request_for_get_complete <- FALSE
