@@ -108,7 +108,21 @@ get_subtable2 <- function(root, path1) {
       browser()
       stop(conditionMessage(e))
     })
-    tmp2 <- sapply(tmp[names(tmp) == "text"], xmlValue) %>%
+    # pick the img which might be "rare word"
+    index.rare_word <- which(names(tmp) == "img") %>%
+      Filter(f = function(n) n > 1 & n < length(tmp)) %>%
+      Filter(f = function(n) all(names(tmp)[c(n-1, n+1)] == "text"))
+    index.text.merged <- lapply(index.rare_word, function(n) c(n-1, n+1))
+    text.merged <- lapply(index.text.merged, function(index) paste(sapply(tmp[index], xmlValue), collapse=""))
+    index.text.merged.head <- sapply(index.text.merged, head, 1)
+    index.text <- which(names(tmp) == "text")
+    index.text.non_merged <- setdiff(index.text, index.text.merged %>% unlist)
+    index.text <- sort(c(index.text.non_merged, index.text.merged.head))
+    info.to.replacement <- match(index.text, index.text.merged.head)
+    tmp2.to.replacement <- which(index.tmp2.replacement %>% is.na %>% `!`)
+    tmp2 <- tmp[index.text] %>% lapply(xmlValue)
+    tmp2[tmp2.to.replacement] <- text.merged
+    tmp2 <- tmp2 %>%
       lapply(gsub, pattern = "\n|\t", replacement = "") %>%
       lapply(function(s) {
         tmp <- regmatches(s, regexec(pattern = "(\\d+)([得]標)(\\d+)([^\\d]*)$", s))[[1]]
