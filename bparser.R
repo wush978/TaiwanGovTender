@@ -130,7 +130,7 @@ get_subtable2 <- function(root, path1) {
     tmp2 <- tmp2 %>%
       lapply(gsub, pattern = "\n|\t", replacement = "") %>%
       lapply(function(s) {
-        tmp <- regmatches(s, regexec(pattern = "(\\d+)([得]標)(\\d+)([^\\d]*)$", s))[[1]]
+        tmp <- regmatches(s, regexec(pattern = "(\\d+)(未?[得]標)(\\d+)([^\\d]*)$", s))[[1]]
         list(id = tmp[4], name = tmp[5], is_win = (tmp[2] == "得標"))
       })
     names(tmp2) <- NULL
