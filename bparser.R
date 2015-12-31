@@ -119,7 +119,7 @@ get_subtable2 <- function(root, path1) {
     index.text.non_merged <- setdiff(index.text, index.text.merged %>% unlist)
     index.text <- sort(c(index.text.non_merged, index.text.merged.head))
     info.to.replacement <- match(index.text, index.text.merged.head)
-    tmp2.to.replacement <- which(index.tmp2.replacement %>% is.na %>% `!`)
+    tmp2.to.replacement <- which(info.to.replacement %>% is.na %>% `!`)
     tmp2 <- tmp[index.text] %>% lapply(xmlValue)
     tmp2[tmp2.to.replacement] <- text.merged
     tmp2 <- tmp2 %>%
