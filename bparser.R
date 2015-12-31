@@ -201,11 +201,15 @@ minimum_parse <-function(file_name, rm_html = TRUE, save_a_csv_for_each = FALSE)
     root <- set_root(file_name)
     retval <- list()
     #1 機關資料
-
+    path1 <- "//form[@id='mainForm']/table/tr/td/div[@id='printArea']/table/tbody/tr[@class='award_table_tr_1']/th"
+    path2 <- "//form[@id='mainForm']/table/tr/td/div[@id='printArea']/table/tbody/tr[@class='award_table_tr_1']/td"
+    pattern_list <- list("機關代碼")
+    retval[["org_info"]] <- get_subtable(root, path1, path2, prefix = "", add_prefix = FALSE, shift = 1, keep_all = FALSE, pattern_list = pattern_list)
+    
     #2 採購資料
     path1 <- "//form[@id='mainForm']/table/tr/td/div[@id='printArea']/table/tbody/tr[@class='award_table_tr_2']/th"
     path2 <- "//form[@id='mainForm']/table/tr/td/div[@id='printArea']/table/tbody/tr[@class='award_table_tr_2']/td"
-    pattern_list <- list("標案案號")
+    pattern_list <- list("標案案號", "招標方式", "決標方式")
     retval[["purchase_info"]] <- get_subtable(root, path1, path2, prefix = "", add_prefix = FALSE, shift = 1, keep_all = FALSE, pattern_list = pattern_list)  
       
     #3 投標廠商
