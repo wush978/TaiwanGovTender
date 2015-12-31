@@ -112,16 +112,21 @@ get_subtable2 <- function(root, path1) {
     index.rare_word <- which(names(tmp) == "img") %>%
       Filter(f = function(n) n > 1 & n < length(tmp)) %>%
       Filter(f = function(n) all(names(tmp)[c(n-1, n+1)] == "text"))
-    index.text.merged <- lapply(index.rare_word, function(n) c(n-1, n+1))
-    text.merged <- lapply(index.text.merged, function(index) paste(sapply(tmp[index], xmlValue), collapse=""))
-    index.text.merged.head <- sapply(index.text.merged, head, 1)
-    index.text <- which(names(tmp) == "text")
-    index.text.non_merged <- setdiff(index.text, index.text.merged %>% unlist)
-    index.text <- sort(c(index.text.non_merged, index.text.merged.head))
-    info.to.replacement <- match(index.text, index.text.merged.head)
-    tmp2.to.replacement <- which(info.to.replacement %>% is.na %>% `!`)
-    tmp2 <- tmp[index.text] %>% lapply(xmlValue)
-    tmp2[tmp2.to.replacement] <- text.merged
+    if (length(index.rare_word) == 0) {
+      index.text <- which(names(tmp) == "text")
+      tmp2 <- tmp[index.text] %>% lapply(xmlValue)
+    } else {
+      index.text.merged <- lapply(index.rare_word, function(n) c(n-1, n+1))
+      text.merged <- lapply(index.text.merged, function(index) paste(sapply(tmp[index], xmlValue), collapse=""))
+      index.text.merged.head <- sapply(index.text.merged, head, 1)
+      index.text <- which(names(tmp) == "text")
+      index.text.non_merged <- setdiff(index.text, index.text.merged %>% unlist)
+      index.text <- sort(c(index.text.non_merged, index.text.merged.head))
+      info.to.replacement <- match(index.text, index.text.merged.head)
+      tmp2.to.replacement <- which(info.to.replacement %>% is.na %>% `!`)
+      tmp2 <- tmp[index.text] %>% lapply(xmlValue)
+      tmp2[tmp2.to.replacement] <- text.merged
+    }
     tmp2 <- tmp2 %>%
       lapply(gsub, pattern = "\n|\t", replacement = "") %>%
       lapply(function(s) {
