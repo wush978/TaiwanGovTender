@@ -8,15 +8,16 @@ suppressPackageStartupMessages({
 })
 .rank <- comm.rank()
 .size <- comm.size()
-if (.rank == 0) {
-  all_dir <- dir("tenders", "gz$", recursive = TRUE, full.names = TRUE)
-  # all_dir <- head(all_dir, 50)
-  loginfo(sprintf("There are total %d files to process...", length(all_dir)))
-  invisible(bcast(all_dir))
-} else {
-  all_dir <- bcast(character(0))
-  loginfo(sprintf("Receiving total %d files to process...", length(all_dir)))
-}
+# if (.rank == 0) {
+#   all_dir <- dir("tenders", "gz$", recursive = TRUE, full.names = TRUE)
+#   # all_dir <- head(all_dir, 50)
+#   loginfo(sprintf("There are total %d files to process...", length(all_dir)))
+#   invisible(bcast(all_dir))
+# } else {
+#   all_dir <- bcast(character(0))
+#   loginfo(sprintf("Receiving total %d files to process...", length(all_dir)))
+# }
+all_dir <- readRDS("all_dir.Rds")
 jid <- pbdMPI::get.jid(length(all_dir))
 loginfo(sprintf("I have %d files to process", length(jid)))
 url_format <- "http://web.pcc.gov.tw/tps/main/pms/tps/atm/atmAwardAction.do?newEdit=false&searchMode=common&method=inquiryForPublic&pkAtmMain=%s&tenderCaseNo=%s&contentMode=%d"
