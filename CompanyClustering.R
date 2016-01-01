@@ -74,6 +74,9 @@ transitivity(g, type = "global")
 lec <- leading.eigenvector.community(g)
 length(lec$membership)
 table(lec$membership)
+
+setkey(companies, "id")
+companies[V(g)$name[which(lec$membership == 1)]]
 # 
 # library(intergraph)
 # m <- intergraph:::as.matrix.igraph(g, matrix.type = "adjacency", sparse = FALSE)
