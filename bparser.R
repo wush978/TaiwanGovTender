@@ -313,9 +313,11 @@ minimum_parse <-function(file_name, rm_html = TRUE, save_a_csv_for_each = FALSE,
           award <- gsub(",", "", tmp) %>%
             as.numeric
           stopifnot(!is.na(award))
+          award
         }
       })
     )
+    stopifnot(!is.null(retval[["tender_award"]]$award))
     remove_html(file_name, rm_html)   
 #     if(save_a_csv_for_each) {
 #         export_to_csv(file_name, purchase_info, tender_award_info, tender_company_info)
